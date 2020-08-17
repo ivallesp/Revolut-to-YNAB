@@ -16,22 +16,22 @@ from src.exceptions import (
 logger = logging.getLogger(__name__)
 
 
-def update_ynab(account_name):
+def update_ynab(account_alias):
     """Call the Revolut API with account name specified, download all the transactions,
     and bulk push them to YNAB through their API.
 
     Args:
-        account_name (str): Name of the Revolut account as configured in the
+        account_alias (str): Name of the Revolut account as configured in the
         config/Revolut.toml file.
     """
     ynab_conf = load_ynab_config()["ynab"]
-    revolut_conf = get_revolut_account_config(account_name)
-    ynab_account_name = revolut_conf["ynab_account"]
+    revolut_conf = get_revolut_account_config(account_alias)
+    ynab_account_alias = revolut_conf["ynab_account"]
     budget_name = ynab_conf["budget_name"]
-    transactions = download_revolut_transactions(account_name)
+    transactions = download_revolut_transactions(account_alias)
 
     # Save the transactions for traceback purposes
-    filename = datetime.now().isoformat() + "_" + account_name + ".csv"
+    filename = datetime.now().isoformat() + "_" + account_alias + ".csv"
     path = os.path.join("logs", filename)
     pd.DataFrame(transactions).to_csv(path, sep=",", index=False)
 
@@ -39,7 +39,7 @@ def update_ynab(account_name):
     upload_revolut_transactions_to_ynab(
         transactions_revolut=transactions,
         budget_name=budget_name,
-        account_name=ynab_account_name,
+        account_alias=ynab_account_alias,
     )
 
 
@@ -77,11 +77,11 @@ def filter_revolut_transactions(transactions, config):
     return transactions
 
 
-def download_revolut_transactions(account_name):
+def download_revolut_transactions(account_alias):
     """Download all the Revolut transactions from the specified account
 
     Args:
-        account_name (str): Name of the Revolut account as configured in the
+        account_alias (str): Name of the Revolut account as configured in the
         config/revolut.toml file
 
     Raises:
@@ -92,9 +92,9 @@ def download_revolut_transactions(account_name):
     Returns:
         list: transactions with the revolut native format
     """
-    logger.info(f"Retrieving Revolut transactions from the account '{account_name}'...")
+    logger.info(f"Retrieving Revolut transactions from the account '{account_alias}'...")
     # Get access
-    client = get_revolut_client(account_name)
+    client = get_revolut_client(account_alias)
     # Get Revolut transactions
     logger.info("Requesting transfers to the Revolut API...")
     transactions = client.get_account_transactions().raw_list
@@ -103,7 +103,7 @@ def download_revolut_transactions(account_name):
 
 
 def upload_revolut_transactions_to_ynab(
-    transactions_revolut, budget_name, account_name
+    transactions_revolut, budget_name, account_alias
 ):
     """Gets a set of transactions as input and uploads them to the specified budget
     and account. It uses the bulk method for uploading the transactions to YNAB
@@ -111,7 +111,7 @@ def upload_revolut_transactions_to_ynab(
     Args:
         transactions_revolut (list): list of dictionaries, Revolut native format
         budget_name (str): name of the budget as configured in the config/ynab.toml
-        account_name (str): name of the YNAB account associated to a Revolut account as
+        account_alias (str): name of the YNAB account associated to a Revolut account as
         configured in the config/Revolut.toml
 
     Raises:
@@ -122,7 +122,7 @@ def upload_revolut_transactions_to_ynab(
     """
     logger.info(
         f"Requested {len(transactions_revolut)} transaction updates to budget "
-        f"'{budget_name}' and account '{account_name}'"
+        f"'{budget_name}' and account '{account_alias}'"
     )
     # Get an instance of YNAB and Revolut APIs
     ynab_cli = get_ynab_client()
@@ -143,15 +143,15 @@ def upload_revolut_transactions_to_ynab(
     # Find the existing accounts and its respective IDs in YNAB, within the budget
     ynab_account_id_map = get_ynab_account_id_mapping(ynab_cli, budget_id)
     # If the account name is not among the account names retrieved, raise an exception
-    if account_name not in ynab_account_id_map:
+    if account_alias not in ynab_account_id_map:
         accounts = list(ynab_account_id_map.keys())
         accounts_str = "'" + "', '".join(accounts) + "'"
         raise AccountNotFoundError(
-            f"YNAB account named '{account_name}' not found, available ones: {accounts_str}"
+            f"YNAB account named '{account_alias}' not found, available ones: {accounts_str}"
         )
     # Get the account ID
-    account_id = ynab_account_id_map[account_name]
-    logger.info(f"Account with name '{account_name}' paired with id '{account_id}'")
+    account_id = ynab_account_id_map[account_alias]
+    logger.info(f"Account with name '{account_alias}' paired with id '{account_id}'")
     logger.info(f"Translating transactions to YNAB format...")
     transactions_ynab = list(
         map(
@@ -234,16 +234,16 @@ def get_ynab_client():
     return ynab_client
 
 
-def get_revolut_client(account_name):
+def get_revolut_client(account_alias):
     """Handles the Revolut connection and returns the cli
 
     Args:
-        account_name (str): name of the YNAB account associated to a Revolut account
+        account_alias (str): name of the YNAB account associated to a Revolut account
         as configured in the config/Revolut.toml
 
     Returns:
         revolut.Revolut: client ready to query the API
     """
-    config = get_revolut_account_config(account_name)
+    config = get_revolut_account_config(account_alias)
     client = Revolut(device_id=config["device_id"], token=config["token"])
     return client
