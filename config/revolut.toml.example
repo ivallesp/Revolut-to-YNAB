@@ -1,0 +1,11 @@
+[alan]
+token = "token-got-from-revolut"
+device_id = "device-id-got-from-revolut"
+ynab_account = "alan-turing"
+currency = "GBP"
+
+[geoffrey]
+token = "token-got-from-revolut"
+device_id = "device-id-got-from-revolut"
+ynab_account = "geoffrey-hinton"
+currency = "EUR"

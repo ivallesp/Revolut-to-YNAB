@@ -10,13 +10,8 @@ def get_config_path():
     return path
 
 
-def get_n26_token_data_filepath(account_name):
-    path = os.path.join(get_config_path(), f"token_data_{account_name}")
-    return path
-
-
-def get_n26_config_filepath():
-    path = os.path.join("config", f"n26.toml")
+def get_revolut_config_filepath():
+    path = os.path.join("config", f"revolut.toml")
     if not os.path.exists(path):
         raise ValueError(
             f"Account {account_name} not configured. File {path} not found!"

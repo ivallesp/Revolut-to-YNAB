@@ -8,9 +8,9 @@ logger = logging.getLogger(__name__)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="N26 to YNAB bridge. Run the program to download the transactions "
-        "from the N26 account and upload the into the YNAB budget account. "
-        "Example: python main.py -a my_account_name"
+        description="Revolut to YNAB bridge. Run the program to download the "
+        "transactions from the N26 account and upload the into the YNAB budget "
+        "account. Example: python main.py -a my_account_name"
     )
 
     parser.add_argument(
@@ -18,7 +18,7 @@ if __name__ == "__main__":
         action="store",
         dest="account",
         required=True,
-        help="Name of the account to update. Has to be defined in config/n26.toml",
+        help="Name of the account to update. Has to be defined in config/revolut.toml",
     )
 
     results = parser.parse_args()

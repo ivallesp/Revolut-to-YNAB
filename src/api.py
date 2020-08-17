@@ -1,81 +1,88 @@
 import logging
-import tenacity
-import time
 import os
 import ynab_client
 
-import n26.api
-import n26.config
+from revolut import Revolut
 import pandas as pd
 
 from datetime import datetime
 
-from src.paths import get_n26_token_data_filepath
-from src.config import load_ynab_config, get_n26_account_config
+from src.config import load_ynab_config, get_revolut_account_config
 from src.exceptions import (
     BudgetNotFoundError,
     AccountNotFoundError,
-    AuthenticationTimeoutError,
 )
 
 logger = logging.getLogger(__name__)
 
 
 def update_ynab(account_name):
-    """Call the N26 API with account name specified, download all the transactions, and
-    bulk push them to YNAB through their API.
+    """Call the Revolut API with account name specified, download all the transactions,
+    and bulk push them to YNAB through their API.
 
     Args:
-        account_name (str): Name of the N26 account as configured in the config/n26.toml
-        file.
+        account_name (str): Name of the Revolut account as configured in the
+        config/Revolut.toml file.
     """
     ynab_conf = load_ynab_config()["ynab"]
-    n26_conf = get_n26_account_config(account_name)
-    ynab_account_name = n26_conf["ynab_account"]
+    revolut_conf = get_revolut_account_config(account_name)
+    ynab_account_name = revolut_conf["ynab_account"]
     budget_name = ynab_conf["budget_name"]
-    transactions = download_n26_transactions(account_name)
+    transactions = download_revolut_transactions(account_name)
 
     # Save the transactions for traceback purposes
     filename = datetime.now().isoformat() + "_" + account_name + ".csv"
     path = os.path.join("logs", filename)
     pd.DataFrame(transactions).to_csv(path, sep=",", index=False)
 
-    transactions = filter_transactions(transactions)
-    upload_n26_transactions_to_ynab(
-        transactions_n26=transactions,
+    transactions = filter_revolut_transactions(transactions, config=revolut_conf)
+    upload_revolut_transactions_to_ynab(
+        transactions_revolut=transactions,
         budget_name=budget_name,
         account_name=ynab_account_name,
     )
 
 
-def filter_transactions(transactions):
+def filter_revolut_transactions(transactions, config):
     """
     This function is intended to be applied to the raw list of transactions provided by
-    the N26 API.
+    the revolut API.
 
     Args:
         transactions (list): list of dictionaries, one dict per transaction, as given by
-        the N26 API.
+        the revolut API.
 
     Returns:
         list: same format as the input transactions list but potentially shortened.
     """
+    # Remove transactions in different currency
+    logger.info(f"Received {len(transactions)} transactions to filter")
+    currency = config["currency"]
+    transactions = list(filter(lambda x: x["currency"] in currency, transactions))
+    logger.info(
+        f"{len(transactions)} transactions remaining after applying the "
+        "currency filter!"
+    )
+
     # Remove the temporary transactions. These transactions will disappear and be
     # replaced by permanent ones. If not removed, this causes duplicates in YNAB,
     # because they have different import IDs.
-    logger.info(f"Received {len(transactions)} transactions to filter")
-    filtered_types = ["AA", "AE", "AV"]
-    transactions = list(filter(lambda x: x["type"] not in filtered_types, transactions))
-    logger.info(f"{len(transactions)} transactions remaining after applying the filter!")
+    filtered_types = ["DECLINED", "FAILED", "REVERTED"]
+    transactions = list(
+        filter(lambda x: x["state"] not in filtered_types, transactions)
+    )
+    logger.info(
+        f"{len(transactions)} transactions remaining after applying the filter!"
+    )
     return transactions
 
 
-def download_n26_transactions(account_name):
-    """Download all the N26 transactions from the specified account
+def download_revolut_transactions(account_name):
+    """Download all the Revolut transactions from the specified account
 
     Args:
-        account_name (str): Name of the N26 account as configured in the config/n26.toml
-        file
+        account_name (str): Name of the Revolut account as configured in the
+        config/revolut.toml file
 
     Raises:
         AuthenticationTimeoutError: if the user doesn't give acces through the mobile
@@ -83,42 +90,29 @@ def download_n26_transactions(account_name):
         user does not respond after 5 trials, the function fails with this exception.
 
     Returns:
-        list: transactions with the N26 native format
+        list: transactions with the revolut native format
     """
-    logger.info(f"Retrieving N26 transactions from the account '{account_name}'...")
+    logger.info(f"Retrieving Revolut transactions from the account '{account_name}'...")
     # Get access
-    client = get_n26_client(account_name)
-    # Get N26 transactions
-    watchdog = 5  # trials before failure
-    delay = 30  # minutes
-    while watchdog >= 0:  # If there are still trials left...
-        logger.info("Requesting transfers to the N26 API...")
-        try:
-            # Try to call the API. This will potentially show a two-factor notification
-            # in the phone of the user. In that case, if the access is not granted, the
-            # api client will timeout with a tenacy.RetryError exception
-            transactions = client.get_transactions(limit=99999)
-            break  # Exit the loop on success
-        except tenacity.RetryError:
-            logger.error("No app authentication provided! Waiting 30 min...")
-            if watchdog <= 0:
-                raise AuthenticationTimeoutError("two-factor auth failed! 😡")
-            watchdog -= 1
-            time.sleep(60 * delay)
-
+    client = get_revolut_client(account_name)
+    # Get Revolut transactions
+    logger.info("Requesting transfers to the Revolut API...")
+    transactions = client.get_account_transactions().raw_list
     logger.info(f"{len(transactions)} transactions have been retrieved!")
     return transactions
 
 
-def upload_n26_transactions_to_ynab(transactions_n26, budget_name, account_name):
+def upload_revolut_transactions_to_ynab(
+    transactions_revolut, budget_name, account_name
+):
     """Gets a set of transactions as input and uploads them to the specified budget
     and account. It uses the bulk method for uploading the transactions to YNAB
 
     Args:
-        transactions_n26 (list): list of dictionaries, N26 native format
+        transactions_revolut (list): list of dictionaries, Revolut native format
         budget_name (str): name of the budget as configured in the config/ynab.toml
-        account_name (str): name of the YNAB account associated to a N26 account as
-        configured in the config/n26.toml
+        account_name (str): name of the YNAB account associated to a Revolut account as
+        configured in the config/Revolut.toml
 
     Raises:
         BudgetNotFoundError: this exception is raised when the budget specified does
@@ -127,10 +121,10 @@ def upload_n26_transactions_to_ynab(transactions_n26, budget_name, account_name)
         not exist in the specified budget of the YNAB account configured
     """
     logger.info(
-        f"Requested {len(transactions_n26)} transaction updates to budget "
+        f"Requested {len(transactions_revolut)} transaction updates to budget "
         f"'{budget_name}' and account '{account_name}'"
     )
-    # Get an instance of YNAB and N26 APIs
+    # Get an instance of YNAB and Revolut APIs
     ynab_cli = get_ynab_client()
 
     # Find the existing budgets and its respective IDs in YNAB
@@ -160,7 +154,10 @@ def upload_n26_transactions_to_ynab(transactions_n26, budget_name, account_name)
     logger.info(f"Account with name '{account_name}' paired with id '{account_id}'")
     logger.info(f"Translating transactions to YNAB format...")
     transactions_ynab = list(
-        map(lambda t: _convert_n26_transaction_to_ynab(t, account_id), transactions_n26)
+        map(
+            lambda t: _convert_revolut_transaction_to_ynab(t, account_id),
+            transactions_revolut,
+        )
     )
     logger.info(f"Requesting transactions push to the YNAB api...")
     transactions_ynab = ynab_cli.BulkTransactions(transactions=transactions_ynab)
@@ -168,27 +165,28 @@ def upload_n26_transactions_to_ynab(transactions_n26, budget_name, account_name)
     logger.info(f"Transactions pushed to YNAB successfully!")
 
 
-def _convert_n26_transaction_to_ynab(t_n26, account_id):
-    """Converts from the N26 format to the YNAB format. Can be enhanced so that it
-    translates from the N26 automatic categorization to the YNAB one.
+def _convert_revolut_transaction_to_ynab(t_revolut, account_id):
+    """Converts from the Revolut format to the YNAB format. Can be enhanced so that it
+    translates from the Revolut automatic categorization to the YNAB one.
 
     Args:
-        t_n26 (dict): dictionary containing all the N26 native transaction keys
+        t_revolut (dict): dictionary containing all the rRvolut native transaction keys
         account_id (str): id of the YNAB account
 
     Returns:
         ynab_client.Transaction: transaction in the YNAB native format.
     """
     t_ynab = {
-        "id": t_n26["id"],
-        "import_id": t_n26["id"],
+        "id": t_revolut["id"],
+        "import_id": t_revolut["id"],
+        "memo": t_revolut["description"],
         "account_id": account_id,
-        "date": datetime.fromtimestamp(t_n26["visibleTS"] / 1000),
-        "amount": int(t_n26["amount"] * 1000),
+        "date": datetime.fromtimestamp(t_revolut["createdDate"] / 1000),
+        "amount": int(t_revolut["amount"] - t_revolut["fee"]) * 10,
         "cleared": "uncleared",
         "approved": False,
         "deleted": False,
-        "payee_name": t_n26.get("merchantName", None),
+        "payee_name": t_revolut.get("merchant", {}).get("name", None),
     }
     t_ynab = ynab_client.TransactionWrapper(t_ynab)
     return t_ynab.transaction
@@ -236,23 +234,16 @@ def get_ynab_client():
     return ynab_client
 
 
-def get_n26_client(account_name):
-    """Handles the N26 connection and returns the cli
+def get_revolut_client(account_name):
+    """Handles the Revolut connection and returns the cli
 
     Args:
-        account_name (str): name of the YNAB account associated to a N26 account as
-        configured in the config/n26.toml
+        account_name (str): name of the YNAB account associated to a Revolut account
+        as configured in the config/Revolut.toml
 
     Returns:
-        n26.api.Api: client ready to query the API
+        revolut.Revolut: client ready to query the API
     """
-    config = get_n26_account_config(account_name)
-    conf = n26.config.Config(validate=False)
-    conf.USERNAME.value = config["username"]
-    conf.PASSWORD.value = config["password"]
-    conf.LOGIN_DATA_STORE_PATH.value = get_n26_token_data_filepath(account_name)
-    conf.MFA_TYPE.value = config["mfa_type"]
-    conf.DEVICE_TOKEN.value = config["device_token"]
-    conf.validate()
-    client = n26.api.Api(conf)
+    config = get_revolut_account_config(account_name)
+    client = Revolut(device_id=config["device_id"], token=config["token"])
     return client
