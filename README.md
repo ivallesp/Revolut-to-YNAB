@@ -15,8 +15,8 @@ Follow the next steps to have the project running in your system:
    version
 4. Configure poetry with `poetry config virtualenvs.in-project true`
 5. Create the virtual environment with `poetry install`
-6. Create the `config/ynab.toml` file following the example in the same folder
-7. Create the `config/revolut.toml` file following the example in the same folder. Make sure you establish the links from each account configured here to the desired YNAB account name. To get the token and device-id, please follow the steps of the ![revolut python package](https://github.com/tducret/revolut-python) (you will have to run `revolut_cli.py' in your shell, without the `python` keyword, and follow the steps).
+6. Create the `config/ynab.toml` file following the example in the same folder. 
+7. Create the `config/revolut.toml` file following the example in the same folder. Make sure you establish the links from each account configured here to the desired YNAB account name. To get the token and device-id, please follow the steps of the ![revolut python package](https://github.com/tducret/revolut-python) (you will have to run `revolut_cli.py` in your shell, without the `python` keyword, and follow the steps).
 8. Activate the environment with `source .venv/bin/activate`
 9.  Run `python main.py -a <revolut-account-name>` to send the transactions from the Revolut account specified to the YNAB account
 
