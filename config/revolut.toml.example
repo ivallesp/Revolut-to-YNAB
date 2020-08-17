@@ -1,13 +1,13 @@
 [alan]
-token = "token-got-from-revolut"
-device_id = "device-id-got-from-revolut"
-ynab_current_account_name = "alan-turing"
-ynab_account_alias = "ynab-gbp"
-currency = "GBP"
+token = "token-got-from-revolut"  # Run `revolut_cli.py`
+device_id = "device-id-got-from-revolut"  # Run `revolut_cli.py`
+ynab_account_alias = "ynab-gbp"  # Alias of the configured account in config/ynab.toml
+ynab_current_account_name = "alan-turing"  # Name of the YNAB account this Revolut transactions will be pushed to
+currency = "GBP"  # Currency to filter the Revolut transactions by
 
 [geoffrey]
-token = "token-got-from-revolut"
-device_id = "device-id-got-from-revolut"
-ynab_current_account_name = "geoffrey-hinton"
-ynab_account_alias = "ynab-eur"
-currency = "EUR"
+token = "token-got-from-revolut"  # Run `revolut_cli.py`
+device_id = "device-id-got-from-revolut"  # Run `revolut_cli.py`
+ynab_account_alias = "ynab-eur"  # Alias of the configured account in config/ynab.toml
+ynab_current_account_name = "geoffrey-hinton"  # Name of the YNAB account this Revolut transactions will be pushed to
+currency = "EUR"  # Currency to filter the Revolut transactions by
