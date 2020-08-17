@@ -1,3 +1,7 @@
-[ynab]
-budget_name = "test_budget_name"
+[ynab-eur]
+budget_name = "test_budget_name_in_eur"
+api_key = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+
+[ynab-gbp]
+budget_name = "test_budget_name_in_gbp"
 api_key = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"

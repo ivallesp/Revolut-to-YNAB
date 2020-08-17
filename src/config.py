@@ -17,5 +17,12 @@ def load_revolut_config():
 def get_revolut_account_config(account_alias):
     config = load_revolut_config()
     if account_alias not in config:
-        raise ValueError(f"Account with alias {account_alias} not found in n26.toml")
+        raise ValueError(f"Account with alias {account_alias} not found in revolut.toml")
+    return config[account_alias]
+
+
+def get_ynab_account_config(account_alias):
+    config = load_ynab_config()
+    if account_alias not in config:
+        raise ValueError(f"Account with alias {account_alias} not found in ynab.toml")
     return config[account_alias]
