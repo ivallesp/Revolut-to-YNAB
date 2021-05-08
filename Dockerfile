@@ -35,4 +35,4 @@ COPY logging.ini logging.ini
 RUN mkdir logs
 
 # Run python command
-CMD python main.py -a $REVOLUT_ACCOUNT
+CMD for ACCOUNT in $ACCOUNTS; do python main.py -a $ACCOUNT; done
