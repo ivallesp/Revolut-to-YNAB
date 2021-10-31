@@ -5,7 +5,7 @@ import ynab_client
 from revolut import Revolut
 import pandas as pd
 
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from src.config import get_ynab_account_config, get_revolut_account_config
 from src.exceptions import (
@@ -76,7 +76,16 @@ def filter_revolut_transactions(transactions, config):
     logger.info(
         f"{len(transactions)} transactions remaining after applying the filter!"
     )
-    return transactions
+
+    # Filter transactions from more then 5 years ago. YNAB restriction, cannot handle
+    # transactions with more than 5 years old.
+    threshold = datetime.now() - timedelta(days = 365*5-30)  # Now - (5 years - 1 month)
+
+    transactions = filter(
+        lambda t: datetime.fromtimestamp(t["createdDate"] / 1000) > threshold,
+        transactions
+    )
+    return list(transactions)
 
 
 def download_revolut_transactions(account_alias):
